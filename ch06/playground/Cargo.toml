@@ -1,0 +1,9 @@
+[package]
+name = "playground"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clearscreen = "3.0.0"
+device_query = "2.1.0"
+tokio = { version = "1.42.0", features = ["full"] }
