@@ -8,6 +8,7 @@ async fn cleanup() {
         println!("ctrl-c received!");
         count += 1;
         if count > 2 {
+            println!("Has matado el proceso manualmente");
             std::process::exit(0);
         }
     }
