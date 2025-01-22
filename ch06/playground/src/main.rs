@@ -7,12 +7,22 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
+use device_query::DeviceState;
+
 const TEMP: LazyCell<Rc<RefCell<i16>>> = LazyCell::new(|| Rc::new(RefCell::new(1010)));
 const DESIRED_TEMP: LazyCell<Rc<RefCell<i16>>> = LazyCell::new(|| Rc::new(RefCell::new(1200)));
 const HEAT_ON: LazyCell<Rc<RefCell<bool>>> = LazyCell::new(|| Rc::new(RefCell::new(false)));
 
-//const INPUT: LazyCell<Rc<RefCell<String>>> = LazyCell::new(|| Rc::new(RefCell::new(String::new())));
-//const DEVICE_STATE: LazyCell<Rc<DeviceState>> = LazyCell::new(|| Rc::new(DeviceState::new()));
+const INPUT: LazyCell<Rc<RefCell<String>>> = LazyCell::new(|| Rc::new(RefCell::new(String::new())));
+
+// Conditional compilation for DEVICE_STATE
+#[cfg(target_os = "macos")]
+static DEVICE_STATE: LazyLock<Arc<DeviceState>> = LazyLock::new(|| Arc::new(DeviceState::new()));
+
+#[cfg(not(target_os = "macos"))]
+thread_local! {
+    static DEVICE_STATE: DeviceState = DeviceState::new();
+}
 
 pub fn render(temp: i16, desired_temp: i16, heat_on: bool, input: String) {
     clearscreen::clear().unwrap();
@@ -136,9 +146,9 @@ impl Future for HeatLossFuture {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() {
-    /*let _guard = DEVICE_STATE.on_key_down(|key| {
+    let _guard = DEVICE_STATE.on_key_down(|key| {
         {
             let input = INPUT.clone();
 
@@ -150,7 +160,7 @@ async fn main() {
             *HEAT_ON.clone().as_ref().borrow(),
             INPUT.clone().as_ref().borrow().clone(),
         );
-    });*/
+    });
 
     let display = tokio::spawn(async { DisplayFuture::new().await });
     let heat_loss = tokio::spawn(async { HeatLossFuture::new().await });

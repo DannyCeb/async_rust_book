@@ -1,49 +1,12 @@
-use tokio::{
-    io::AsyncReadExt,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        oneshot,
-    },
+use tokio::sync::{
+    mpsc::channel,
+    mpsc::{Receiver, Sender},
+    oneshot,
 };
-
-use serde_json;
-use tokio::fs::File;
-
-use std::collections::HashMap;
-use std::sync::OnceLock;
-use tokio::io::{self, AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt};
 
 static ROUTER_SENDER: OnceLock<Sender<RoutingMessage>> = OnceLock::new();
 
-enum WriterLogMessage {
-    Set(String, Vec<u8>),
-    Delete(String),
-    Get(oneshot::Sender<HashMap<String, Vec<u8>>>),
-}
-
-impl WriterLogMessage {
-    fn from_key_value_message(message: &KeyValueMessage) -> Option<WriterLogMessage> {
-        match message {
-            KeyValueMessage::Get(_) => None,
-            KeyValueMessage::Delete(message) => Some(WriterLogMessage::Delete(message.key.clone())),
-            KeyValueMessage::Set(message) => Some(WriterLogMessage::Set(
-                message.key.clone(),
-                message.value.clone(),
-            )),
-        }
-    }
-}
-
-async fn read_data_from_file(file_path: &str) -> io::Result<HashMap<String, Vec<u8>>> {
-    let mut file = File::open(file_path).await?;
-    let mut contents = String::new();
-
-    file.read_to_string(&mut contents).await?;
-
-    let data: HashMap<String, Vec<u8>> = serde_json::from_str(&contents)?;
-
-    Ok(data)
-}
+use std::sync::OnceLock;
 
 struct SetKeyValueMessage {
     key: String,
@@ -72,7 +35,7 @@ enum RoutingMessage {
 }
 
 async fn key_value_actor(mut receiver: Receiver<KeyValueMessage>) {
-    let mut map: HashMap<String, Vec<u8>> = std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<String, Vec<u8>> = std::collections::HashMap::new();
 
     while let Some(message) = receiver.recv().await {
         match message {
