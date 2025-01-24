@@ -6,7 +6,7 @@ use tokio::{
     },
 };
 
-use serde_json;
+use serde_json::{self, value};
 use tokio::fs::File;
 
 use std::collections::HashMap;
@@ -43,6 +43,47 @@ async fn read_data_from_file(file_path: &str) -> io::Result<HashMap<String, Vec<
     let data: HashMap<String, Vec<u8>> = serde_json::from_str(&contents)?;
 
     Ok(data)
+}
+
+async fn load_map(file_path: &str) -> HashMap<String, Vec<u8>> {
+    match read_data_from_file(file_path).await {
+        Ok(map) => {
+            println!("Data loaded from file: {:?}", map);
+            map
+        }
+        Err(e) => {
+            println!("Faile to read from file: {:?}", e);
+            println!("Starting with an empty hashmap.");
+            HashMap::new()
+        }
+    }
+}
+
+async fn writer_actor(mut receiver: Receiver<WriterLogMessage>) -> io::Result<()> {
+    let mut map = load_map("./data.json").await;
+    let mut file = File::create("./data.json").await?;
+
+    while let Some(message) = receiver.recv().await {
+        match message {
+            WriterLogMessage::Set(key, value) => {
+                map.insert(key, value).unwrap();
+            }
+            WriterLogMessage::Delete(key) => {
+                map.remove(&key);
+            }
+            WriterLogMessage::Get(response) => {
+                let _ = response.send(map.clone());
+            }
+        };
+
+        let contents = serde_json::to_string(&map).unwrap();
+        file.set_len(0).await?;
+        file.seek(std::io::SeekFrom::Start(0)).await?;
+        file.write_all(contents.as_bytes()).await?;
+        file.flush().await?;
+    }
+
+    Ok(())
 }
 
 struct SetKeyValueMessage {
