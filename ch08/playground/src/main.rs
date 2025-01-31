@@ -113,9 +113,22 @@ enum RoutingMessage {
 }
 
 async fn key_value_actor(mut receiver: Receiver<KeyValueMessage>) {
-    let mut map: HashMap<String, Vec<u8>> = std::collections::HashMap::new();
+    let (writer_key_value_sender, writer_key_value_receiver) = channel(32);
+
+    tokio::spawn(writer_actor(writer_key_value_receiver));
+
+    let (get_sender, get_receiver) = oneshot::channel();
+    let _ = writer_key_value_sender
+        .send(WriterLogMessage::Get(get_sender))
+        .await;
+
+    let mut map: HashMap<String, Vec<u8>> = get_receiver.await.unwrap();
 
     while let Some(message) = receiver.recv().await {
+        if let Some(write_message) = WriterLogMessage::from_key_value_message(&message) {
+            let _ = writer_key_value_sender.send(write_message).await;
+        }
+
         match message {
             KeyValueMessage::Get(GetKeyValueMessage { key, response }) => {
                 let _ = response.send(map.get(&key).cloned());
