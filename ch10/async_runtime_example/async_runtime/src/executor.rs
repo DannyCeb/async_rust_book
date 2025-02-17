@@ -36,6 +36,7 @@ impl Executor {
 
         let future: Pin<Box<dyn Future<Output = ()> + Send>> = Box::pin(async move {
             let result = future.await;
+
             let _ = tx.send(result);
         });
 
